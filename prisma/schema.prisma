@@ -1,0 +1,31 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+// Tabel Riwayat Pemindaian
+model ScanLog {
+  id                 String   @id @default(uuid()) @db.Uuid
+  messageContent     String   @map("message_content") @db.Text
+  extractedUrls      Json?    @map("extracted_urls") // Link yang ditemukan dalam teks
+  messageRiskScore   Float?   @map("message_risk_score")
+  urlRiskScore       Float?   @map("url_risk_score")
+  finalStatus        String   @map("final_status") @db.VarChar(50)
+  aiReasons          Json?    @map("ai_reasons") // Penjelasan edukatif AI
+  createdAt          DateTime @default(now()) @map("created_at")
+
+  @@map("scan_logs")
+}
+
+// Tabel Admin
+model Admin {
+  id           String   @id @default(uuid()) @db.Uuid
+  username     String   @unique @db.VarChar(100)
+  passwordHash String   @map("password_hash") @db.VarChar(255)
+  createdAt    DateTime @default(now()) @map("created_at")
+
+  @@map("admins")
+}

@@ -1,6 +1,8 @@
 const express = require('express');
 const cors = require('cors');
 const helmet = require('helmet');
+const swaggerUi = require('swagger-ui-express'); // Import Swagger UI
+const swaggerDocs = require('./config/swagger'); // Import Konfigurasi Swagger
 
 const app = express();
 
@@ -17,5 +19,10 @@ app.get('/', (req, res) => {
         message: "AwasLink API Server is ready to scan!"
     });
 });
+
+// Menambahkan rute antarmuka dokumentasi Swagger UI
+app.use('/api-docs', swaggerUi.serve, swaggerUi.setup(swaggerDocs));
+
+// ROUTES
 
 module.exports = app;
