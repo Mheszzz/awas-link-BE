@@ -5,6 +5,8 @@ const swaggerUi = require('swagger-ui-express');
 const swaggerDocs = require('./config/swagger');
 
 const scanRoute = require('./routes/scanRoute');
+const authRoutes = require('./routes/authRoutes');
+const dashboardRoutes = require('./routes/dashboardRoutes');
 
 const app = express();
 
@@ -17,7 +19,10 @@ app.use(express.urlencoded({ extended: true }));
 
 app.use('/api-docs', swaggerUi.serve, swaggerUi.setup(swaggerDocs));
 
+// Registrasi seluruh Route API v1
 app.use('/api/v1/scans', scanRoute);
+app.use('/api/v1/auth', authRoutes);
+app.use('/api/v1/dashboard', dashboardRoutes);
 
 app.get('/', (req, res) => {
     res.status(200).json({
@@ -26,4 +31,4 @@ app.get('/', (req, res) => {
     });
 });
 
-module.exports = app;
+module.exports = app;

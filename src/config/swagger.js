@@ -14,11 +14,21 @@ const swaggerOptions = {
         servers: [
             {
                 url: `http://localhost:${process.env.PORT || 3000}`,
-                description: ''
+                description: 'Development Server'
             }
         ],
+        components: {
+            securitySchemes: {
+                BearerAuth: {
+                    type: 'http',
+                    scheme: 'bearer',
+                    bearerFormat: 'JWT',
+                    description: 'Masukkan JWT token yang didapat dari endpoint POST /api/v1/auth/login'
+                }
+            }
+        }
     },
-    apis: ['./src/routes/*.js'], 
+    apis: ['./src/routes/*.js'],
 };
 
 const swaggerDocs = swaggerJsDoc(swaggerOptions);
