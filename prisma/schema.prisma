@@ -7,11 +7,12 @@ datasource db {
 }
 
 model ScanLog {
-  id                 String   @id @default(uuid()) @db.Uuid
-  messageContent     String   @map("message_content") @db.Text
-  messageRiskScore   Float?   @map("message_risk_score") // Menyimpan 'confidence' dari AI
-  finalStatus        String   @map("final_status") @db.VarChar(50) // Menyimpan 'verdict'
-  createdAt          DateTime @default(now()) @map("created_at")
+  id               String   @id @default(uuid()) @db.Uuid
+  messageContent   String   @map("message_content") @db.Text
+  messageRiskScore Float?   @map("message_risk_score")
+  finalStatus      String   @map("final_status") @db.VarChar(50)
+  createdAt        DateTime  @default(now()) @map("created_at")
+  deletedAt        DateTime? @map("deleted_at")
 
   @@map("scan_logs")
 }

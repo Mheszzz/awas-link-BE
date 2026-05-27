@@ -22,11 +22,9 @@ const authController = require('../controllers/authController');
  *             properties:
  *               username:
  *                 type: string
- *                 description: Username akun admin
  *                 example: "admin"
  *               password:
  *                 type: string
- *                 description: Password akun admin
  *                 example: "adminpassword123"
  *     responses:
  *       200:
@@ -42,48 +40,30 @@ const authController = require('../controllers/authController');
  *                 message:
  *                   type: string
  *                   example: "Login berhasil."
- *                 token:
- *                   type: string
- *                   example: "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9..."
+ *                 data:
+ *                   type: object
+ *                   properties:
+ *                     token:
+ *                       type: string
+ *                       example: "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9..."
  *       400:
  *         description: Input tidak lengkap
  *         content:
  *           application/json:
  *             schema:
- *               type: object
- *               properties:
- *                 success:
- *                   type: boolean
- *                   example: false
- *                 message:
- *                   type: string
- *                   example: "Username dan password wajib diisi."
+ *               $ref: '#/components/schemas/ErrorResponse'
  *       401:
  *         description: Kredensial salah
  *         content:
  *           application/json:
  *             schema:
- *               type: object
- *               properties:
- *                 success:
- *                   type: boolean
- *                   example: false
- *                 message:
- *                   type: string
- *                   example: "Username atau password salah."
+ *               $ref: '#/components/schemas/ErrorResponse'
  *       500:
  *         description: Terjadi kesalahan pada server
  *         content:
  *           application/json:
  *             schema:
- *               type: object
- *               properties:
- *                 success:
- *                   type: boolean
- *                   example: false
- *                 message:
- *                   type: string
- *                   example: "Terjadi kesalahan pada server."
+ *               $ref: '#/components/schemas/ErrorResponse'
  */
 router.post('/login', authController.loginAdmin);
 

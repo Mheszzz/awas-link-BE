@@ -6,7 +6,7 @@ const authenticateAdmin = (req, res, next) => {
   if (!authHeader || !authHeader.startsWith('Bearer ')) {
     return res.status(401).json({
       success: false,
-      message: 'Akses ditolak. Token autentikasi tidak ditemukan.'
+      message: 'Akses ditolak. Anda belum login sebagai admin.'
     });
   }
 

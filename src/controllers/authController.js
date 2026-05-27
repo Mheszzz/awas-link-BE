@@ -1,55 +1,26 @@
-const bcrypt = require('bcryptjs');
-const jwt = require('jsonwebtoken');
-const prisma = require('../config/database');
+const { sendSuccess, sendError } = require('../utils/response');
+const authService = require('../services/authService');
 
+/**
+ * POST /api/v1/auth/login
+ * Login admin dan mendapatkan JWT token.
+ */
 const loginAdmin = async (req, res) => {
   try {
     const { username, password } = req.body;
+
     if (!username || !password) {
-      return res.status(400).json({
-        success: false,
-        message: 'Username dan password wajib diisi.'
-      });
+      return sendError(res, 400, 'Username dan password wajib diisi.');
     }
 
-    const admin = await prisma.admin.findUnique({
-      where: { username }
-    });
+    const result = await authService.loginAdmin(username, password);
 
-    if (!admin) {
-      return res.status(401).json({
-        success: false,
-        message: 'Username atau password salah.'
-      });
-    }
-
-    const isPasswordValid = await bcrypt.compare(password, admin.passwordHash);
-
-    if (!isPasswordValid) {
-      return res.status(401).json({
-        success: false,
-        message: 'Username atau password salah.'
-      });
-    }
-
-    const token = jwt.sign(
-      { id: admin.id, username: admin.username },
-      process.env.JWT_SECRET,
-      { expiresIn: '1d' }
-    );
-
-    return res.status(200).json({
-      success: true,
-      message: 'Login berhasil.',
-      token
-    });
-
+    return sendSuccess(res, 200, 'Login berhasil.', result);
   } catch (error) {
-    console.error('Login Error:', error.message);
-    return res.status(500).json({
-      success: false,
-      message: 'Terjadi kesalahan pada server.'
-    });
+    const statusCode = error.statusCode || 500;
+    const message = statusCode === 500 ? 'Terjadi kesalahan pada server.' : error.message;
+    console.error('loginAdmin Error:', error.message);
+    return sendError(res, statusCode, message);
   }
 };
 
