@@ -1,294 +1,426 @@
-# 🛡️ AwasLink Back-End — Project Blueprint & Context Specification
+# AwasLink Back-End — Project Context for AI
 
-AwasLink adalah platform penyedia arsitektur RESTful API terintegrasi yang berfungsi sebagai "Pusat Kendali" dalam mendeteksi indikasi penipuan digital murni teks (*scam NLP*) sekaligus tautan berbahaya (*phishing*). 
-
-Dokumen ini dirancang khusus untuk memastikan pengembang maupun model kecerdasan buatan (AI) dapat memahami perencanaan, struktur data, arsitektur jaringan, alur logika, serta implementasi teknis proyek secara instan tanpa kesalahan konteks.
-
----
-
-## 1. Arsitektur Sistem & Alur Kerja Data (Data Flow)
-
-AwasLink menerapkan arsitektur decoupled berbasis **Model-View-Controller (MVC)** pada sisi *Back-End* (Node.js/Express.js) yang menjembatani *Front-End* (React/Vue UI) dengan *Inference Machine Learning Server* yang di-*hosting* di Hugging Face Spaces (FastAPI/TensorFlow).
-
-[ FRONT-END (Gilang UI) ]
-│
-│ (1) POST /api/v1/scans { message_content }
-▼
-[ BACK-END EXPRESS.JS ] ──(2) Validasi Karakter & Tipe Data
-│
-│ (3) POST /predict { message: message_content } (Timeout 15s)
-▼
-[ HUGGING FACE SPACES ] ──(4) Model ANN (TensorFlow) + TF-IDF Vectorizer
-│
-│ (5) Response JSON { verdict, confidence, message }
-▼
-[ BACK-END EXPRESS.JS ]
-│
-│ (6) Sinkronisasi ORM Prisma (Connection Pool / Singleton)
-▼
-[ DATABASE POSTGRESQL ]
-│
-│ (7) Write Record ke Tabel scan_logs
-▼
-[ FRONT-END (Gilang UI) ] ──(8) Render UI Kartu Status & Skor Akurasi
-
-
-### Mekanisme Fault-Tolerance (Anti-Crash)
-Sistem dilengkapi dengan pembatas *Error Boundary* terisolasi menggunakan blok `try-catch` independen pada lapisan *networking call* (Axios). Jika terjadi gangguan konektivitas, kegagalan internal *Inference Server*, atau *Cold Start* pada Hugging Face Spaces, *Back-End* akan menangkap *error* secara anggun dan mengembalikan kode status HTTP **503 Service Unavailable**, mencegah seluruh peladen Node.js mengalami kegagalan fatal (*crash*).
+> File ini adalah sumber kebenaran (source of truth) untuk AI assistant.
+> Baca file ini terlebih dahulu sebelum melakukan perubahan apapun agar tidak menebak-nebak.
 
 ---
 
-## 2. Spesifikasi Tech Stack & Library Dependensi
+## 1. Ringkasan Proyek
 
-### Core Runtime & Framework
-* **Runtime Environment:** Node.js (v18+ LTS)
-* **Web Framework:** Express.js (v5.2.1) — Menangani manajemen *routing*, *middleware*, dan *parsing request body*.
+**AwasLink** adalah RESTful API server untuk mendeteksi pesan scam/phishing.
+Pengguna mengirim teks pesan → Back-End meneruskan ke AI service → AI menganalisis → Hasil disimpan ke database → Dikembalikan ke Front-End.
 
-### Database & ORM Layer
-* **Object-Relational Mapping (ORM):** Prisma ORM (v7.8.0)
-* **Database Engine:** PostgreSQL (v14+)
-* **Driver & Adapter:** `@prisma/adapter-pg` (^7.8.0) bersama library `pg` (^8.20.0). Digunakan untuk mengimplementasikan *Native Driver Adapter* murni Node.js guna mereduksi beban *binary engine* bawaan Prisma dan mengoptimalkan performa manajemen memori.
-
-### Security & Authentication
-* **Helmet.js (v8.1.0):** Mengamankan HTTP Headers (mencegah XSS, Clickjacking, dan MIME-type sniffing).
-* **CORS (v2.8.6):** Mengatur kebijakan pembatasan akses lintas asal domain (*Cross-Origin Resource Sharing*).
-* **BcryptJS (v2.4.3):** Mengamankan enkripsi satu arah (*cryptographic hashing*) kata sandi akun Admin sebelum disimpan di database dengan tingkat kompleksitas *Salt Rounds* = 10.
-* **JSON Web Token / JWT (v9.0.2):** Menyediakan mekanisme otentikasi berbasis token (*stateless token authentication*) dengan masa kedaluwarsa 24 jam (`1d`).
-
-### Networking & Documentation
-* **Axios (v1.16.0):** HTTP Client berbasis *promise* untuk melakukan *networking calls* asinkron ke server AI Hugging Face.
-* **Swagger UI Express (v5.0.1) & Swagger JSDoc (v6.2.8):** Generator antarmuka dokumentasi API interaktif berbasis anotasi YAML langsung di dalam file *routing*.
+| Aspek          | Detail                                                    |
+| -------------- | --------------------------------------------------------- |
+| Runtime        | Node.js (v18+ LTS)                                       |
+| Framework      | Express.js v5.2.1                                        |
+| ORM            | Prisma v7.8.0 dengan `@prisma/adapter-pg` (native driver)|
+| Database       | PostgreSQL (Supabase, via PgBouncer connection pooling)   |
+| AI Service     | FastAPI di Hugging Face Spaces (model ANN + TF-IDF)       |
+| Auth           | JWT (jsonwebtoken) + bcryptjs                             |
+| Docs           | Swagger UI di `/api-docs`                                 |
 
 ---
 
-## 3. Struktur Direktori Proyek
+## 2. Arsitektur & Alur Data
 
-AwasLink BE mengadopsi standar tata kelola folder industri dengan pemisahan tanggung jawab (*Separation of Concerns*):
+[PUBLIC — tanpa auth]
 
-awas-link-be/
-├── node_modules/             # Dependensi library npm (terisolasi)
-├── prisma/                   # Rumah konfigurasi Prisma ORM
-│   ├── migrations/           # Direktori riwayat Save State skema SQL database
-│   ├── schema.prisma         # Definisi struktur skema data aplikasi
-│   └── seed.js               # Skrip inisialisasi awal (seeding) data Admin default
-├── src/                      # Source Code utama aplikasi
-│   ├── config/               # Modul konfigurasi global instansiasi server
-│   │   ├── database.js       # Setup Pool koneksi PostgreSQL & Singleton PrismaClient
-│   │   └── swagger.js        # Dokumen konfigurasi metadata OpenAPI/Swagger
-│   ├── controllers/          # Logika Bisnis Utama (Business Logic Layer)
-│   │   ├── authController.js # Logika registrasi token JWT & verifikasi admin
-│   │   ├── dashboardController.js # Logika pemrosesan data agregat publik & admin
-│   │   └── scanController.js # Logika inti validasi teks, Axios call AI, & Prisma write
-│   ├── middleware/           # Interceptor request HTTP
-│   │   └── authMiddleware.js # Satpam pemeriksa validitas token JWT di header HTTP
-│   ├── routes/               # Pemetaan URL Endpoint API (Routing Layer)
-│   │   ├── authRoutes.js     # Endpoint login admin (/api/v1/auth)
-│   │   ├── dashboardRoutes.js# Endpoint data dashboard (/api/v1/dashboard)
-│   │   └── scanRoutes.js     # Endpoint pemindaian teks (/api/v1/scans)
-│   └── app.js                # Konfigurasi middleware global Express & registrasi router
-├── .env                      # Kunci rahasia & variabel lingkungan (wajib disembunyikan)
-├── .gitignore                # Daftar file/folder yang dilarang diunggah ke GitHub
-├── index.js                  # Entry Point utama aplikasi (menyalakan port & koneksi DB)
-├── package.json              # Manifes proyek, daftar dependensi, dan skrip eksekusi
-└── prisma.config.js          # File konfigurasi datasource database mutlak untuk Prisma v7
+Front-End ──POST /api/v1/scans──► scanController.scanMessage
+                                      │
+                                      ▼
+                                 scanService.analyzeAndSaveMessage
+                                      │
+                          ┌───────────┴───────────┐
+                          │ axios.post → AI       │
+                          │ (HuggingFace /predict) │
+                          └───────────┬───────────┘
+                                      │
+                                      ▼
+                               prisma.scanLog.create → Response ke FE
 
+Front-End ──GET /api/v1/scans/history──► scanController.getPublicHistory
+                                              │
+                                              ▼
+                                        scanService.getPublicHistory
+                                              │
+                                              ▼
+                                        prisma.scanLog (count + findMany 20 terbaru)
+
+Front-End ──POST /api/v1/auth/login──► authController → authService → JWT token
+
+[PRIVATE — wajib JWT Bearer token]
+
+Admin FE  ──GET /api/v1/admin/logs?page=1&limit=20&status=Aman
+              │
+              ▼
+         (authMiddleware) → adminController.getAdminLogs
+                                  │ parsing query params
+                                  ▼
+                            adminService.getAdminLogs(page, limit, status)
+                                  │
+                                  ▼
+                            prisma.scanLog (count + findMany with pagination & filter)
+
+Admin FE  ──DELETE /api/v1/admin/logs/:id──► (authMiddleware) → adminController → adminService
+Admin FE  ──DELETE /api/v1/admin/logs──► (authMiddleware) → adminController → adminService
 
 ---
 
-## 4. Struktur Skema Database (`prisma/schema.prisma`)
+## 3. Struktur Folder & Tanggung Jawab Setiap File
 
-Sesuai dengan standarisasi Prisma versi 7, berkas skema difokuskan murni pada representasi struktur entitas tabel tanpa menyimpan URL koneksi mentah (URL dipindahkan ke `prisma.config.js`).
+```
+awas-link-BE/
+├── index.js                    # Entry point. Load dotenv, start Express server.
+├── prisma.config.js            # Konfigurasi Prisma v7 (datasource DIRECT_URL untuk migrasi)
+├── package.json                # Dependencies dan npm scripts
+│
+├── prisma/
+│   ├── schema.prisma           # Definisi tabel: ScanLog, Admin
+│   ├── seed.js                 # Buat akun admin default (upsert, idempotent)
+│   └── migrations/             # History migrasi SQL
+│
+└── src/
+    ├── app.js                  # Konfigurasi Express: middleware, swagger, route aggregator
+    │
+    ├── config/
+    │   ├── database.js         # Prisma Client singleton (PgBouncer adapter)
+    │   └── swagger.js          # Konfigurasi OpenAPI 3.0 + reusable schemas
+    │
+    ├── middleware/
+    │   └── authMiddleware.js   # JWT verification → attach req.admin
+    │
+    ├── routes/
+    │   ├── scanRoutes.js       # POST / (scan), GET /history (riwayat publik)
+    │   ├── authRoutes.js       # POST /login
+    │   └── adminRoutes.js      # GET /logs, DELETE /logs/:id, DELETE /logs (semua JWT)
+    │
+    ├── controllers/            # Terima request, validasi input, panggil service, kirim response
+    │   ├── scanController.js   # scanMessage, getPublicHistory
+    │   ├── authController.js   # loginAdmin
+    │   ├── adminController.js  # getAdminLogs, deleteScanLog, deleteAllScanLogs
+    │
+    ├── services/               # Business logic & query database (tidak tahu soal req/res)
+    │   ├── scanService.js      # analyzeAndSaveMessage, getPublicHistory
+    │   ├── authService.js      # loginAdmin (verify password + generate JWT)
+    │   └── adminService.js     # getAdminLogs (pagination+filter), deleteScanLog, deleteAllScanLogs
+    │
+    └── utils/
+        └── response.js         # sendSuccess(res, statusCode, message, data?)
+                                # sendError(res, statusCode, message)
+```
+
+---
+
+## 4. Layered Architecture — Aturan Antar Layer
+
+```
+Routes → Controllers → Services → Prisma (database)
+                 ↘ utils/response.js
+```
+
+| Layer        | Boleh                                          | TIDAK Boleh                                     |
+| ------------ | ---------------------------------------------- | ------------------------------------------------ |
+| **Routes**   | Definisi path, swagger docs, middleware chain   | Logic bisnis, query DB, format response           |
+| **Controllers** | Validasi input dasar (cek kosong, UUID format), panggil service, kirim response via `sendSuccess`/`sendError` | Query database, parsing pagination, filter logic  |
+| **Services** | Query database (prisma), logic bisnis, parsing & validasi params (pagination, filter, limit cap), throw Error dengan `statusCode` | Import `req`/`res`, format HTTP response          |
+| **Utils**    | Helper functions yang reusable                  | Import prisma, logic bisnis                       |
+
+> **Penting:** Controller meneruskan `req.query` mentah ke service. Service yang bertanggung jawab parsing `page`, `limit`, `status` dan menerapkan default values serta validasi (misal: limit max 100, page min 1).
+
+### Pola Error Handling (Service → Controller)
+
+Service melempar Error dengan property `statusCode`:
+```js
+// Di service
+const err = new Error('Log scan tidak ditemukan.');
+err.statusCode = 404;
+throw err;
+```
+
+Controller menangkap dan meneruskan:
+```js
+// Di controller
+catch (error) {
+  const statusCode = error.statusCode || 500;
+  const message = statusCode === 500 ? 'Terjadi kesalahan pada server.' : error.message;
+  console.error('namaFunction Error:', error.message);
+  return sendError(res, statusCode, message);
+}
+```
+
+---
+
+## 5. Database Schema (Prisma)
 
 ```prisma
-generator client {
-  provider = "prisma-client-js"
-}
-
-datasource db {
-  provider = "postgresql"
-  // Koneksi datasource dialihkan mutlak ke file prisma.config.js
-}
-
-// Tabel Riwayat Pemindaian (Log Wall Publik & Dasbor Admin)
 model ScanLog {
-  id                 String   @id @default(uuid()) @db.Uuid
-  messageContent     String   @map("message_content") @db.Text
-  messageRiskScore   Float?   @map("message_risk_score") // Menyimpan skor keyakinan persentase dari AI
-  finalStatus        String   @map("final_status") @db.VarChar(50) // Menyimpan vonis: "Phishing/Scam" atau "Aman"
-  createdAt          DateTime @default(now()) @map("created_at")
-
+  id               String   @id @default(uuid()) @db.Uuid
+  messageContent   String   @map("message_content") @db.Text
+  messageRiskScore Float?   @map("message_risk_score")    // Skor confidence dari AI (0-100)
+  finalStatus      String   @map("final_status") @db.VarChar(50) // "Phishing/Scam" atau "Aman"
+  createdAt        DateTime @default(now()) @map("created_at")
+  deletedAt        DateTime? @map("deleted_at") // Untuk fitur soft delete
   @@map("scan_logs")
 }
 
-// Tabel Autentikasi Pengelola Aplikasi
 model Admin {
   id           String   @id @default(uuid()) @db.Uuid
   username     String   @unique @db.VarChar(100)
-  passwordHash String   @map("password_hash") @db.VarChar(255) // Menyimpan password yang sudah di-hash bcrypt
+  passwordHash String   @map("password_hash") @db.VarChar(255)
   createdAt    DateTime @default(now()) @map("created_at")
-
   @@map("admins")
 }
-5. Spesifikasi Kontrak API & Endpoint (RESTful API)
-Seluruh endpoint API menggunakan prefiks versi global /api/v1.
+```
 
-A. Fitur Inti Pemindaian Teks (Core Detection Feature)
-Endpoint: POST /api/v1/scans
+**Konvensi penamaan:**
+- Prisma model: `camelCase` (contoh: `messageContent`)
+- Kolom SQL aktual: `snake_case` (contoh: `message_content`) via `@map()`
+- Nama tabel SQL: plural `snake_case` (contoh: `scan_logs`) via `@@map()`
 
-Akses: Publik (Tanpa Token)
+### Koneksi Database (Supabase)
 
-Aturan Validasi Input:
+| Variabel       | Kegunaan                                    | Port |
+| -------------- | ------------------------------------------- | ---- |
+| `DATABASE_URL` | Runtime (query) — via PgBouncer pooling     | 6543 |
+| `DIRECT_URL`   | Migrasi Prisma — direct connection          | 5432 |
 
-message_content tidak boleh kosong, wajib bertipe string.
+- `database.js` → menggunakan `DATABASE_URL` untuk `Pool` + `PrismaPg` adapter
+- `prisma.config.js` → menggunakan `DIRECT_URL` untuk migrasi
 
-Panjang karakter maksimal 3000 karakter untuk menjaga performa tokenisasi model NLP AI.
+---
 
-Format Request Body (JSON):
+## 6. API Endpoints (Kontrak untuk Front-End)
 
-JSON
-{
-  "message_content": "Selamat! Nomor Anda terpilih mendapatkan hadiah Rp 50 Juta dari Bank BCA. Segera klik link: bit.ly/hadiahbca"
-}
-Format Response Sukses (200 OK):
+### Semua response mengikuti format:
+```json
+// Sukses
+{ "success": true, "message": "...", "data": { ... } }
 
-JSON
+// Error
+{ "success": false, "message": "..." }
+```
+
+### Public Endpoints (tanpa auth)
+
+#### `POST /api/v1/scans` — Pindai pesan
+```json
+// Request body
+{ "message_content": "Teks pesan yang akan dipindai" }
+
+// Response 200
 {
   "success": true,
   "message": "Pesan berhasil dianalisis oleh AI.",
   "data": {
-    "id": "e4ba39d5-4560-449a-bd9b-cba068018df5",
-    "messageContent": "Selamat! Nomor Anda terpilih mendapatkan hadiah Rp 50 Juta dari Bank BCA. Segera klik link: bit.ly/hadiahbca",
+    "id": "uuid",
+    "messageContent": "...",
     "messageRiskScore": 98.5,
     "finalStatus": "Phishing/Scam",
     "createdAt": "2026-05-22T07:15:30.123Z"
   }
 }
-B. Otentikasi Admin (Authentication Feature)
-Endpoint: POST /api/v1/auth/login
+```
+- Error 400: `message_content` kosong atau bukan string
+- Error 503: AI service tidak bisa dihubungi (timeout 15 detik)
 
-Akses: Publik
+#### `GET /api/v1/scans/history` — Riwayat scan publik
+Mendukung parameter pagination dan filter:
+- `page` (default: 1)
+- `limit` (default: 20, max 100)
+- `status` (opsional: `"Phishing/Scam"` atau `"Aman"`)
 
-Format Request Body (JSON):
-
-JSON
-{
-  "username": "admin",
-  "password": "adminpassword123"
-}
-Format Response Sukses (200 OK):
-
-JSON
-{
-  "success": true,
-  "message": "Login berhasil.",
-  "token": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpZCI6IjFhMm..."
-}
-C. Dinding Riwayat Publik (Public History Wall)
-Endpoint: GET /api/v1/dashboard/public/history
-
-Akses: Publik
-
-Logika Bisnis: Mengambil maksimal 20 data pemindaian terbaru (take: 20, orderBy: { createdAt: 'desc' }) untuk di-mapping oleh Front-End ke dalam komponen feed UI riwayat publik secara utuh.
-
-Format Response Sukses (200 OK):
-
-JSON
+```json
+// Response 200
 {
   "success": true,
   "message": "Berhasil mengambil riwayat pemindaian publik.",
   "data": {
     "total_scanned": 1420,
+    "pagination": { "total": 1420, "page": 1, "limit": 20, "totalPages": 71 },
     "history": [
-      {
-        "id": "e4ba39d5-4560-449a-bd9b-cba068018df5",
-        "messageContent": "Selamat! Nomor Anda terpilih mendapatkan hadiah...",
-        "finalStatus": "Phishing/Scam",
-        "messageRiskScore": 98.5,
-        "createdAt": "2026-05-22T07:15:30.123Z"
-      }
+      { "id": "uuid", "messageContent": "...", "finalStatus": "...", "messageRiskScore": 98.5, "createdAt": "..." }
     ]
   }
 }
-D. Log Dasbor Lengkap Admin (Admin Private Dashboard)
-Endpoint: GET /api/v1/dashboard/admin/logs
+```
 
-Akses: Privat (Wajib menyertakan token JWT pada header HTTP Authorization: Bearer <TOKEN>)
+#### `POST /api/v1/auth/login` — Login admin
+```json
+// Request body
+{ "username": "admin", "password": "adminpassword123" }
 
-Logika Bisnis: Mengembalikan seluruh riwayat log tanpa batasan limit untuk dianalisis oleh Admin atau diekspor sebagai dataset pembelajaran model AI selanjutnya.
-
-6. Sinkronisasi Integrasi Endpoint Machine Learning (FastAPI)
-Back-End terhubung ke server inferensi AI eksternal yang berjalan di Hugging Face Spaces dengan alamat:
-https://lyalythia-awaslink-api.hf.space
-
-Struktur Integrasi Axios:
-Endpoint Tujuan: ${process.env.AI_SERVICE_URL}/predict
-
-Metode HTTP: POST
-
-Kontrak Request Payload (Wajib Sesuai Skema Pydantic MessageInput Python):
-
-Key parameter yang dikirim harus bernama message (bukan text atau message_content).
-
-JSON
+// Response 200
 {
-  "message": "Teks mentah dari input pengguna"
+  "success": true,
+  "message": "Login berhasil.",
+  "data": { "token": "eyJhbGciOi..." }
 }
-Kontrak Response dari FastAPI:
+```
+- Error 400: Username/password tidak diisi
+- Error 401: Kredensial salah
 
-AI memproses teks melalui kombinasi 22 fitur ekstraksi manual (Regex) dan 1.000 fitur berbasis pembobotan TF-IDF untuk dimasukkan ke model klasifikasi ANN (Artificial Neural Network).
+---
 
-Output yang dikembalikan berupa JSON murni dengan format:
+### Private Endpoints (wajib header `Authorization: Bearer <token>`)
 
-JSON
+#### `GET /api/v1/admin/logs` — Semua log + statistik
+`adminService.getAdminLogs` mendukung parameter pagination dan filter:
+- `page` (default: 1)
+- `limit` (default: 20)
+- `status` (opsional: `"Phishing/Scam"` atau `"Aman"`)
+
+```json
+// Response 200
 {
-  "verdict": "Phishing/Scam", 
-  "confidence": 95.50, 
-  "message": "..."
+  "success": true,
+  "message": "Berhasil mengambil seluruh log pemindaian.",
+  "data": {
+    "summary": { "total_scanned": 1420, "total_phishing": 980, "total_aman": 440 },
+    "pagination": { "total": 1420, "page": 1, "limit": 20, "totalPages": 71 },
+    "logs": [ { ... } ]
+  }
 }
-7. Cetak Biru Konfigurasi Variabel Lingkungan (.env)
-Konfigurasi file .env di lingkungan lokal wajib memiliki variabel kontrol berikut agar sistem berjalan normal:
+```
 
-Code snippet
-# Port Peladen Node.js/Express
+#### `DELETE /api/v1/admin/logs/:id` — Soft Delete satu log
+- Validasi UUID format sebelum query (regex di controller)
+- Data tidak terhapus permanen melainkan di set `deletedAt = now()`
+- Error 400: Format UUID tidak valid
+- Error 404: Log tidak ditemukan
+
+#### `DELETE /api/v1/admin/logs` — Soft Delete semua log
+- Data tidak terhapus permanen melainkan di set `deletedAt = now()` untuk seluruh data yang masih aktif (`deletedAt: null`).
+```json
+// Response 200
+{
+  "success": true,
+  "message": "Seluruh log scan berhasil dihapus. Total: 42 data.",
+  "data": { "deleted_count": 42 }
+}
+```
+
+---
+
+## 7. Integrasi AI Service (Hugging Face)
+
+| Aspek         | Detail                                              |
+| ------------- | --------------------------------------------------- |
+| URL           | `${process.env.AI_SERVICE_URL}/predict`              |
+| Method        | POST                                                |
+| Timeout       | 15 detik                                            |
+| Request key   | `message` (**bukan** `message_content` atau `text`) |
+| Response keys | `verdict` (string), `confidence` (float), `message` |
+
+```js
+// Request ke AI
+axios.post(aiUrl, { message: messageContent }, { timeout: 15000 })
+
+// Response dari AI
+{ "verdict": "Phishing/Scam", "confidence": 95.50, "message": "..." }
+```
+
+**Mapping AI response → Database:**
+- `aiResult.confidence` → `messageRiskScore`
+- `aiResult.verdict` → `finalStatus`
+
+---
+
+## 8. Environment Variables (.env)
+
+```env
 PORT=3000
+AI_SERVICE_URL=https://your-ai-service.hf.space
+DATABASE_URL="postgresql://...pooler...supabase.com:6543/postgres?pgbouncer=true"
+DIRECT_URL="postgresql://...pooler...supabase.com:5432/postgres"
+JWT_SECRET="random-string-minimal-32-karakter"
+PRODUCTION_URL=https://your-app.railway.app  # opsional, untuk swagger
+```
 
-# Konfigurasi Database Utama PostgreSQL (Prisma)
-DATABASE_URL="postgresql://<db_username>:<db_password>@<db_host>:<db_port>/<db_name>?schema=public"
+---
 
-# Konfigurasi Alamat Kluster Jaringan Kecerdasan Buatan (AI)
-AI_SERVICE_URL="[https://lyalythia-awaslink-api.hf.space](https://lyalythia-awaslink-api.hf.space)"
+## 9. Coding Conventions & Rules
 
-# Kunci Enkripsi Kriptografi untuk Tanda Tangan Digital Token JWT Admin
-JWT_SECRET="rahasia_awaslink_super_aman_123"
+### Yang HARUS diikuti:
 
-# Environment Mode Kontrol
-NODE_ENV="development"
-8. Panduan Mengaktifkan Sistem dari Nol
-Langkah 1: Instalasi Paket Dependensi
-Bash
+1. **Bahasa variable & function**: `camelCase` dalam bahasa Inggris
+2. **Pesan response ke user**: Bahasa Indonesia
+3. **Console error**: Format `'namaFunction Error:'` diikuti `error.message`
+4. **Response format**: SELALU gunakan `sendSuccess()` / `sendError()` dari `utils/response.js`
+5. **Validasi input**: Di controller, BUKAN di service
+6. **Database query**: Di service, BUKAN di controller
+7. **Import prisma**: Hanya di service, BUKAN di controller
+8. **Error dari service**: Throw `new Error()` dengan property `statusCode`
+9. **UUID validation**: Gunakan regex `UUID_REGEX` yang sudah ada di `adminController.js`
+10. **Swagger docs**: Ditulis sebagai JSDoc comment langsung di file routes
+11. **Reusable schemas**: `ErrorResponse` dan `ScanLog` sudah didefinisikan di `swagger.js`, gunakan `$ref`
+
+### Yang TIDAK BOLEH dilakukan:
+
+1. **Jangan** panggil `require('dotenv').config()` di mana pun selain `index.js`
+2. **Jangan** akses `req` atau `res` di dalam service
+3. **Jangan** query database langsung di controller
+4. **Jangan** hardcode response JSON tanpa `sendSuccess`/`sendError`
+5. **Jangan** buat file baru di root `src/` — tempatkan sesuai layer yang benar
+6. **Jangan** simpan kredensial asli di `.env.example`
+
+---
+
+## 10. Cara Menjalankan
+
+```bash
+# Install dependencies
 npm install
-Langkah 2: Pemetaan Paksa Sinkronisasi Database
-Untuk menyelaraskan struktur PostgreSQL tanpa merusak tabel relasional internal dalam fase pengembangan, gunakan perintah force push Prisma:
 
-Bash
+# Migrasi database (sinkronisasi schema ke Supabase)
 npx prisma db push
 npx prisma generate
-Langkah 3: Suntik Akun Akses Admin Awal (Database Seeding)
-Jalankan skrip penyemaian data bawaan untuk membuat akun admin pertama secara otomatis:
 
-Bash
+# Seed akun admin default (username: admin, password: adminpassword123)
 node prisma/seed.js
-Kredensial Default:
 
-Username: admin
-
-Password: adminpassword123
-
-Langkah 4: Jalankan Mesin Utama
-Bash
+# Jalankan server development (auto-reload)
 npm run dev
-Langkah 5: Buka Sandbox Pengujian Dokumentasi API
-Buka peramban (browser) Anda dan akses halaman Swagger untuk uji coba tembak endpoint nyata:
-👉 http://localhost:3000/api-docs
 
-Dibuat dengan ❤️ oleh Tim Back-End AwasLink
+# Buka dokumentasi API
+# http://localhost:3000/api-docs
+```
+
+---
+
+## 11. Saat Menambah Fitur Baru
+
+Ikuti urutan ini:
+
+1. **Schema** — Tambah/ubah model di `prisma/schema.prisma` → jalankan `npx prisma db push`
+2. **Service** — Buat function bisnis logik di `src/services/namaService.js`
+3. **Controller** — Buat handler yang validasi input + panggil service di `src/controllers/namaController.js`
+4. **Route** — Daftarkan endpoint + swagger docs di `src/routes/namaRoutes.js`
+5. **App** — Daftarkan route baru di `src/app.js` menggunakan `app.use()`
+6. **Test** — Cek di Swagger UI (`/api-docs`)
+
+---
+
+## 12. Dependency List
+
+### Production
+| Package              | Versi    | Fungsi                                          |
+| -------------------- | -------- | ----------------------------------------------- |
+| express              | ^5.2.1   | Web framework                                   |
+| @prisma/client       | ^7.8.0   | ORM client                                      |
+| @prisma/adapter-pg   | ^7.8.0   | Native PG adapter (mengganti binary engine)     |
+| pg                   | ^8.20.0  | PostgreSQL driver                               |
+| axios                | ^1.16.0  | HTTP client untuk panggil AI service             |
+| bcryptjs             | ^3.0.3   | Password hashing                                |
+| jsonwebtoken         | ^9.0.3   | JWT token generation & verification              |
+| cors                 | ^2.8.6   | Cross-Origin Resource Sharing                    |
+| helmet               | ^8.1.0   | Security HTTP headers                            |
+| dotenv               | ^17.4.2  | Load .env ke process.env                         |
+| swagger-jsdoc        | ^6.2.8   | Generate OpenAPI spec dari JSDoc comments        |
+| swagger-ui-express   | ^5.0.1   | Serve Swagger UI di /api-docs                    |
+
+### Development
+| Package | Versi   | Fungsi                     |
+| ------- | ------- | -------------------------- |
+| prisma  | ^7.8.0  | CLI untuk migrasi & generate |
+| nodemon | ^3.1.14 | Auto-reload saat development |
