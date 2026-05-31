@@ -139,4 +139,59 @@ router.post('/', scanController.scanMessage);
  */
 router.get('/history', scanController.getPublicHistory);
 
+/**
+ * @swagger
+ * /api/v1/scans/history/{id}:
+ *   get:
+ *     summary: Detail Riwayat Pemindaian Publik
+ *     description: |
+ *       Mengambil detail riwayat pemindaian publik berdasarkan ID.
+ *       Dapat diakses publik **tanpa autentikasi**.
+ *     tags:
+ *       - Scans
+ *     parameters:
+ *       - in: path
+ *         name: id
+ *         required: true
+ *         schema:
+ *           type: string
+ *           format: uuid
+ *         description: UUID log pemindaian
+ *     responses:
+ *       200:
+ *         description: Berhasil mengambil detail riwayat pemindaian
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 success:
+ *                   type: boolean
+ *                   example: true
+ *                 message:
+ *                   type: string
+ *                   example: "Berhasil mengambil detail log pemindaian."
+ *                 data:
+ *                   $ref: '#/components/schemas/ScanLog'
+ *       400:
+ *         description: Format ID tidak valid
+ *         content:
+ *           application/json:
+ *             schema:
+ *               $ref: '#/components/schemas/ErrorResponse'
+ *       404:
+ *         description: Log tidak ditemukan
+ *         content:
+ *           application/json:
+ *             schema:
+ *               $ref: '#/components/schemas/ErrorResponse'
+ *       500:
+ *         description: Terjadi kesalahan pada server
+ *         content:
+ *           application/json:
+ *             schema:
+ *               $ref: '#/components/schemas/ErrorResponse'
+ */
+router.get('/history/:id', scanController.getScanLogDetail);
+
 module.exports = router;

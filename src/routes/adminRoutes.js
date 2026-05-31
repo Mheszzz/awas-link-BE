@@ -66,6 +66,69 @@ router.get('/logs', authenticateAdmin, adminController.getAdminLogs);
 /**
  * @swagger
  * /api/v1/admin/logs/{id}:
+ *   get:
+ *     summary: Detail Log Pemindaian (Admin)
+ *     description: |
+ *       Mengambil detail log pemindaian lengkap berdasarkan ID.
+ *       **Wajib menyertakan JWT token** yang valid pada header Authorization.
+ *     tags:
+ *       - Admin
+ *     security:
+ *       - BearerAuth: []
+ *     parameters:
+ *       - in: path
+ *         name: id
+ *         required: true
+ *         schema:
+ *           type: string
+ *           format: uuid
+ *         description: UUID log pemindaian
+ *     responses:
+ *       200:
+ *         description: Berhasil mengambil detail log pemindaian
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 success:
+ *                   type: boolean
+ *                   example: true
+ *                 message:
+ *                   type: string
+ *                   example: "Berhasil mengambil detail log pemindaian admin."
+ *                 data:
+ *                   $ref: '#/components/schemas/ScanLog'
+ *       400:
+ *         description: Format ID tidak valid
+ *         content:
+ *           application/json:
+ *             schema:
+ *               $ref: '#/components/schemas/ErrorResponse'
+ *       401:
+ *         description: Token tidak valid atau tidak ditemukan
+ *         content:
+ *           application/json:
+ *             schema:
+ *               $ref: '#/components/schemas/ErrorResponse'
+ *       404:
+ *         description: Log tidak ditemukan
+ *         content:
+ *           application/json:
+ *             schema:
+ *               $ref: '#/components/schemas/ErrorResponse'
+ *       500:
+ *         description: Terjadi kesalahan pada server
+ *         content:
+ *           application/json:
+ *             schema:
+ *               $ref: '#/components/schemas/ErrorResponse'
+ */
+router.get('/logs/:id', authenticateAdmin, adminController.getAdminScanLogDetail);
+
+/**
+ * @swagger
+ * /api/v1/admin/logs/{id}:
  *   delete:
  *     summary: Hapus Satu Log Pemindaian (Admin)
  *     description: |

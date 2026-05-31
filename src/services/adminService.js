@@ -62,4 +62,18 @@ const deleteAllScanLogs = async () => {
   return { deleted_count: result.count };
 };
 
-module.exports = { getAdminLogs, deleteScanLog, deleteAllScanLogs };
+const getAdminScanLogDetail = async (id) => {
+  const log = await prisma.scanLog.findFirst({
+    where: { id, deletedAt: null }
+  });
+
+  if (!log) {
+    const err = new Error('Log scan tidak ditemukan.');
+    err.statusCode = 404;
+    throw err;
+  }
+
+  return log;
+};
+
+module.exports = { getAdminLogs, getAdminScanLogDetail, deleteScanLog, deleteAllScanLogs };

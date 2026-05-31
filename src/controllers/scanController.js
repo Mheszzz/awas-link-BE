@@ -32,7 +32,27 @@ const scanMessage = async (req, res) => {
   }
 };
 
+const getScanLogDetail = async (req, res) => {
+  try {
+    const { id } = req.params;
+
+    const UUID_REGEX = /^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
+    if (!UUID_REGEX.test(id)) {
+      return sendError(res, 400, 'Format ID tidak valid. Harap gunakan UUID yang benar.');
+    }
+
+    const data = await scanService.getScanLogDetail(id);
+    return sendSuccess(res, 200, 'Berhasil mengambil detail log pemindaian.', data);
+  } catch (error) {
+    const statusCode = error.statusCode || 500;
+    const message = statusCode === 500 ? 'Terjadi kesalahan pada server.' : error.message;
+    console.error('getScanLogDetail Error:', error.message);
+    return sendError(res, statusCode, message);
+  }
+};
+
 module.exports = {
   scanMessage,
-  getPublicHistory
+  getPublicHistory,
+  getScanLogDetail
 };

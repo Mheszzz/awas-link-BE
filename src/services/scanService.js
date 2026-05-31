@@ -73,7 +73,29 @@ const getPublicHistory = async (query = {}) => {
   };
 };
 
+const getScanLogDetail = async (id) => {
+  const log = await prisma.scanLog.findFirst({
+    where: { id, deletedAt: null },
+    select: {
+      id: true,
+      messageContent: true,
+      finalStatus: true,
+      messageRiskScore: true,
+      createdAt: true,
+    }
+  });
+
+  if (!log) {
+    const err = new Error('Log scan tidak ditemukan.');
+    err.statusCode = 404;
+    throw err;
+  }
+
+  return log;
+};
+
 module.exports = {
   analyzeAndSaveMessage,
-  getPublicHistory
+  getPublicHistory,
+  getScanLogDetail
 };

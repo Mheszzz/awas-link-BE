@@ -46,8 +46,27 @@ const deleteAllScanLogs = async (req, res) => {
   }
 };
 
+const getAdminScanLogDetail = async (req, res) => {
+  try {
+    const { id } = req.params;
+
+    if (!UUID_REGEX.test(id)) {
+      return sendError(res, 400, 'Format ID tidak valid. Harap gunakan UUID yang benar.');
+    }
+
+    const data = await adminService.getAdminScanLogDetail(id);
+    return sendSuccess(res, 200, 'Berhasil mengambil detail log pemindaian admin.', data);
+  } catch (error) {
+    const statusCode = error.statusCode || 500;
+    const message = statusCode === 500 ? 'Terjadi kesalahan pada server.' : error.message;
+    console.error('getAdminScanLogDetail Error:', error.message);
+    return sendError(res, statusCode, message);
+  }
+};
+
 module.exports = {
   getAdminLogs,
+  getAdminScanLogDetail,
   deleteScanLog,
   deleteAllScanLogs
 };

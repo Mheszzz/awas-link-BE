@@ -24,4 +24,35 @@ const loginAdmin = async (req, res) => {
   }
 };
 
-module.exports = { loginAdmin };
+const refreshToken = async (req, res) => {
+  try {
+    const { refresh_token } = req.body;
+    
+    if (!refresh_token) {
+      return sendError(res, 400, 'Refresh token wajib disertakan.');
+    }
+
+    const result = await authService.refreshAccessToken(refresh_token);
+    return sendSuccess(res, 200, 'Access token berhasil diperbarui.', result);
+  } catch (error) {
+    const statusCode = error.statusCode || 500;
+    const message = statusCode === 500 ? 'Terjadi kesalahan pada server.' : error.message;
+    console.error('refreshToken Error:', error.message);
+    return sendError(res, statusCode, message);
+  }
+};
+
+const logoutAdmin = async (req, res) => {
+  try {
+    const adminId = req.admin.id;
+    await authService.logoutAdmin(adminId);
+    return sendSuccess(res, 200, 'Logout berhasil.');
+  } catch (error) {
+    const statusCode = error.statusCode || 500;
+    const message = statusCode === 500 ? 'Terjadi kesalahan pada server.' : error.message;
+    console.error('logoutAdmin Error:', error.message);
+    return sendError(res, statusCode, message);
+  }
+};
+
+module.exports = { loginAdmin, refreshToken, logoutAdmin };
